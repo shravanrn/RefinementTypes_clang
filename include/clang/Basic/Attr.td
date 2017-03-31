@@ -449,6 +449,14 @@ def XRayInstrument : InheritableAttr {
   let Documentation = [XRayDocs];
 }
 
+def RefineMetadataAtt : InheritableAttr {
+  let Spellings = [GCC<"refinement_metadata">];
+  let Args = [StringArgument<"Refinement">];
+  let Subjects = SubjectList<[FunctionLike, ParmVar, Field],
+                             WarnDiag, "ExpectedFunctionMethodEnumOrClass">;
+  let Documentation = [Undocumented];
+}
+
 def TLSModel : InheritableAttr {
   let Spellings = [GCC<"tls_model">];
   let Subjects = SubjectList<[TLSVar], ErrorDiag, "ExpectedTLSVar">;

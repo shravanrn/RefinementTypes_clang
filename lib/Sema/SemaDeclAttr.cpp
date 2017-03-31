@@ -3857,6 +3857,16 @@ static void handleAlwaysInlineAttr(Sema &S, Decl *D,
     D->addAttr(Inline);
 }
 
+static void handleRefineMetadataAtt(Sema &S, Decl *D, const AttributeList &Attr) {
+	//Any error messages such as missing argument are already handled
+	StringRef metadataTypeString;
+	if (Attr.getNumArgs() && S.checkStringLiteralArgumentAttr(Attr, 0, metadataTypeString)) {
+		D->addAttr(::new (S.Context) RefineMetadataAttAttr(Attr.getRange(), S.Context, metadataTypeString,
+			Attr.getAttributeSpellingListIndex()));
+	}
+}
+
+
 static void handleMinSizeAttr(Sema &S, Decl *D, const AttributeList &Attr) {
   if (MinSizeAttr *MinSize = S.mergeMinSizeAttr(
           D, Attr.getRange(), Attr.getAttributeSpellingListIndex()))
@@ -5724,6 +5734,9 @@ static void ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D,
   case AttributeList::AT_AllocSize:
     handleAllocSizeAttr(S, D, Attr);
     break;
+  case AttributeList::AT_RefineMetadataAtt:
+	  handleRefineMetadataAtt(S, D, Attr);
+	  break;
   case AttributeList::AT_AlwaysInline:
     handleAlwaysInlineAttr(S, D, Attr);
     break;

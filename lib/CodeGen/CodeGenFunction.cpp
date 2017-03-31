@@ -691,6 +691,50 @@ void CodeGenFunction::EmitOpenCLKernelMetadata(const FunctionDecl *FD,
   }
 }
 
+template<typename T>
+bool GetRefinement(T llvmDecl, std::vector<std::string>& refinementMetadata)
+{
+	auto refinementAtt = llvmDecl->getAttr<RefineMetadataAttAttr>();
+
+	if (refinementAtt != nullptr)
+	{
+		std::string refMetadataNodeString = refinementAtt->getRefinement().str();
+		refinementMetadata.push_back(refMetadataNodeString);
+		return true;
+	}
+
+	return false;
+}
+
+void storeRefinementsInMetadata(const Decl *D, llvm::Function *Fn, const FunctionArgList &Args, llvm::LLVMContext& context)
+{
+	bool applyRefinement = false;
+	std::vector<std::string> parameterRefinements;
+
+	if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(D))
+	{
+		applyRefinement |= GetRefinement(FD, parameterRefinements);
+
+		for (auto i = Args.begin(), e = Args.end(); i != e; ++i) {
+			const VarDecl *VD = *i;
+			applyRefinement |= GetRefinement(VD, parameterRefinements);
+		}
+	}
+
+	if (applyRefinement)
+	{
+		std::vector<llvm::Metadata*> metadata;
+		for (auto currRefine = parameterRefinements.begin(); currRefine != parameterRefinements.end(); currRefine++)
+		{
+			metadata.push_back(llvm::MDString::get(context, *currRefine));
+		}
+
+		llvm::MDNode* refinements = llvm::MDTuple::get(context, metadata);
+		Fn->addMetadata("refinement", *refinements);
+	}
+
+}
+
 /// Determine whether the function F ends with a return stmt.
 static bool endsWithReturn(const Decl* F) {
   const Stmt *Body = nullptr;
@@ -729,6 +773,8 @@ void CodeGenFunction::StartFunction(GlobalDecl GD,
   CurFn = Fn;
   CurFnInfo = &FnInfo;
   assert(CurFn->isDeclaration() && "Function already has body?");
+
+  storeRefinementsInMetadata(D, Fn, Args, getLLVMContext());
 
   if (CGM.isInSanitizerBlacklist(Fn, Loc))
     SanOpts.clear();
