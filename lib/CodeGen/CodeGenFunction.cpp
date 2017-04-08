@@ -698,15 +698,21 @@ bool GetRefinement(T llvmDecl, std::vector<std::string>& refinementMetadata)
 
 	if (refinementAtt != nullptr)
 	{
-		std::string refMetadataNodeString = refinementAtt->getRefinement().str();
-		refinementMetadata.push_back(refMetadataNodeString);
+		{
+			std::string refMetadataNodeString = refinementAtt->getRefinementKey().str();
+			refinementMetadata.push_back(refMetadataNodeString);
+		}
+		{
+			std::string refMetadataNodeString = refinementAtt->getRefinementValue().str();
+			refinementMetadata.push_back(refMetadataNodeString);
+		}
 		return true;
 	}
 
 	return false;
 }
 
-void storeRefinementsInMetadata(const Decl *D, llvm::Function *Fn, const FunctionArgList &Args, llvm::LLVMContext& context)
+void storeRefinementsInMetadata(const Decl *D, QualType RetTy, llvm::Function *Fn, const FunctionArgList &Args, llvm::LLVMContext& context)
 {
 	bool applyRefinement = false;
 	std::vector<std::string> parameterRefinements;
@@ -719,18 +725,29 @@ void storeRefinementsInMetadata(const Decl *D, llvm::Function *Fn, const Functio
 			const VarDecl *VD = *i;
 			applyRefinement |= GetRefinement(VD, parameterRefinements);
 		}
-	}
 
-	if (applyRefinement)
-	{
-		std::vector<llvm::Metadata*> metadata;
-		for (auto currRefine = parameterRefinements.begin(); currRefine != parameterRefinements.end(); currRefine++)
+		if (applyRefinement)
 		{
-			metadata.push_back(llvm::MDString::get(context, *currRefine));
-		}
+			//add the function signature to the refinement metadata
+			parameterRefinements.push_back("signature_return");
+			parameterRefinements.push_back(RetTy.getAsString());
 
-		llvm::MDNode* refinements = llvm::MDTuple::get(context, metadata);
-		Fn->addMetadata("refinement", *refinements);
+			for (auto i = Args.begin(), e = Args.end(); i != e; ++i) {
+				const VarDecl *VD = *i;
+				parameterRefinements.push_back("signature_parameter");
+				parameterRefinements.push_back(VD->getType().getAsString());
+			}
+
+			//Create metadata nodes
+			std::vector<llvm::Metadata*> metadata;
+			for (auto currRefine = parameterRefinements.begin(); currRefine != parameterRefinements.end(); currRefine++)
+			{
+				metadata.push_back(llvm::MDString::get(context, *currRefine));
+			}
+
+			llvm::MDNode* refinements = llvm::MDTuple::get(context, metadata);
+			Fn->addMetadata("refinement", *refinements);
+		}
 	}
 
 }
@@ -774,7 +791,7 @@ void CodeGenFunction::StartFunction(GlobalDecl GD,
   CurFnInfo = &FnInfo;
   assert(CurFn->isDeclaration() && "Function already has body?");
 
-  storeRefinementsInMetadata(D, Fn, Args, getLLVMContext());
+  storeRefinementsInMetadata(D, RetTy, Fn, Args, getLLVMContext());
 
   if (CGM.isInSanitizerBlacklist(Fn, Loc))
     SanOpts.clear();

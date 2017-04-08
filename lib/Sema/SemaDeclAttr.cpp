@@ -3859,9 +3859,9 @@ static void handleAlwaysInlineAttr(Sema &S, Decl *D,
 
 static void handleRefineMetadataAtt(Sema &S, Decl *D, const AttributeList &Attr) {
 	//Any error messages such as missing argument are already handled
-	StringRef metadataTypeString;
-	if (Attr.getNumArgs() && S.checkStringLiteralArgumentAttr(Attr, 0, metadataTypeString)) {
-		D->addAttr(::new (S.Context) RefineMetadataAttAttr(Attr.getRange(), S.Context, metadataTypeString,
+	StringRef metadataKeyString, metadataValueString;
+	if (Attr.getNumArgs() && S.checkStringLiteralArgumentAttr(Attr, 0, metadataKeyString) && S.checkStringLiteralArgumentAttr(Attr, 1, metadataValueString)) {
+		D->addAttr(::new (S.Context) RefineMetadataAttAttr(Attr.getRange(), S.Context, metadataKeyString, metadataValueString,
 			Attr.getAttributeSpellingListIndex()));
 	}
 }

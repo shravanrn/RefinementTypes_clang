@@ -451,7 +451,7 @@ def XRayInstrument : InheritableAttr {
 
 def RefineMetadataAtt : InheritableAttr {
   let Spellings = [GCC<"refinement_metadata">];
-  let Args = [StringArgument<"Refinement">];
+  let Args = [StringArgument<"RefinementKey">, StringArgument<"RefinementValue">];
   let Subjects = SubjectList<[FunctionLike, ParmVar, Field],
                              WarnDiag, "ExpectedFunctionMethodEnumOrClass">;
   let Documentation = [Undocumented];
