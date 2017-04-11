@@ -3130,6 +3130,8 @@ def err_attribute_regparm_wrong_platform : Error<
   "'regparm' is not valid on this platform">;
 def err_attribute_regparm_invalid_number : Error<
   "'regparm' parameter must be between 0 and %0 inclusive">;
+def err_attribute_refinement_parent_fn_not_found : Error<
+  "Could not find parent function for %0 attribute">;
 def err_attribute_not_supported_in_lang : Error<
   "%0 attribute is not supported in %select{C|C++|Objective-C}1">;
 

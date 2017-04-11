@@ -692,51 +692,90 @@ void CodeGenFunction::EmitOpenCLKernelMetadata(const FunctionDecl *FD,
 }
 
 template<typename T>
-bool GetRefinement(T llvmDecl, std::vector<std::string>& refinementMetadata)
+void RetrieveTypeAndName(T llvmDecl, std::vector<std::string>& refinementMetadata, bool isReturn)
 {
-	auto refinementAtt = llvmDecl->getAttr<RefineMetadataAttAttr>();
+	{
+		std::string typeNameString = llvmDecl->getType().getAsString();
+		refinementMetadata.push_back(typeNameString);
+	}
+	{
+		std::string varNameString = isReturn ? "return" : llvmDecl->getIdentifier()->getName().str();
+		refinementMetadata.push_back(varNameString);
+	}
+}
 
+template<typename T>
+void GetRefinement(T llvmDecl, std::vector<std::string>& refinementMetadata)
+{
+	{
+		auto refinementAtt = llvmDecl->getAttr<RefineAssumeAttAttr>();
+		refinementMetadata.push_back("assume");
+
+		if (refinementAtt != nullptr)
+		{
+			std::string refValueString = refinementAtt->getRefinement().str();
+			refinementMetadata.push_back(refValueString);
+		}
+		else
+		{
+			refinementMetadata.push_back("");
+		}
+		refinementMetadata.push_back("end");
+	}
+	{
+		auto refinementAtt = llvmDecl->getAttr<RefineVerifyAttAttr>();
+		refinementMetadata.push_back("verify");
+
+		if (refinementAtt != nullptr)
+		{
+			std::string refValueString = refinementAtt->getRefinement().str();
+			refinementMetadata.push_back(refValueString);
+		}
+		else
+		{
+			refinementMetadata.push_back("");
+		}
+		refinementMetadata.push_back("end");
+	}
+}
+
+void RetrieveQualifiers(const FunctionDecl* FD, std::vector<std::string>& refinementMetadata)
+{
+	auto refinementAtt = FD->getAttr<RefineQualifierAttAttr>();
 	if (refinementAtt != nullptr)
 	{
+		for (auto& qualifier : refinementAtt->qualifiers())
 		{
-			std::string refMetadataNodeString = refinementAtt->getRefinementKey().str();
-			refinementMetadata.push_back(refMetadataNodeString);
+			refinementMetadata.push_back("qualifier");
+			refinementMetadata.push_back(qualifier.str());
+			refinementMetadata.push_back("end");
 		}
-		{
-			std::string refMetadataNodeString = refinementAtt->getRefinementValue().str();
-			refinementMetadata.push_back(refMetadataNodeString);
-		}
-		return true;
 	}
-
-	return false;
 }
 
 void storeRefinementsInMetadata(const Decl *D, QualType RetTy, llvm::Function *Fn, const FunctionArgList &Args, llvm::LLVMContext& context)
 {
-	bool applyRefinement = false;
-	std::vector<std::string> parameterRefinements;
-
 	if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(D))
 	{
-		applyRefinement |= GetRefinement(FD, parameterRefinements);
+		bool applyRefinement = D->getAttr<RefineFunctionAttAttr>() != nullptr;
 
-		for (auto i = Args.begin(), e = Args.end(); i != e; ++i) {
-			const VarDecl *VD = *i;
-			applyRefinement |= GetRefinement(VD, parameterRefinements);
-		}
-
-		if (applyRefinement)
+		if(applyRefinement)
 		{
-			//add the function signature to the refinement metadata
+			std::vector<std::string> parameterRefinements;
 			parameterRefinements.push_back("signature_return");
-			parameterRefinements.push_back(RetTy.getAsString());
+			RetrieveTypeAndName(FD, parameterRefinements, true /* isReturn */);
+			parameterRefinements.push_back("end");
+			GetRefinement(FD, parameterRefinements);
 
 			for (auto i = Args.begin(), e = Args.end(); i != e; ++i) {
 				const VarDecl *VD = *i;
 				parameterRefinements.push_back("signature_parameter");
-				parameterRefinements.push_back(VD->getType().getAsString());
+				RetrieveTypeAndName(VD, parameterRefinements, false /* isReturn */);
+				parameterRefinements.push_back("end");
+				GetRefinement(VD, parameterRefinements);
 			}
+
+			RetrieveQualifiers(FD, parameterRefinements);
 
 			//Create metadata nodes
 			std::vector<llvm::Metadata*> metadata;
@@ -749,7 +788,6 @@ void storeRefinementsInMetadata(const Decl *D, QualType RetTy, llvm::Function *F
 			Fn->addMetadata("refinement", *refinements);
 		}
 	}
-
 }
 
 /// Determine whether the function F ends with a return stmt.

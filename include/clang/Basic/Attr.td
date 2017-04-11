@@ -449,11 +449,35 @@ def XRayInstrument : InheritableAttr {
   let Documentation = [XRayDocs];
 }
 
-def RefineMetadataAtt : InheritableAttr {
-  let Spellings = [GCC<"refinement_metadata">];
-  let Args = [StringArgument<"RefinementKey">, StringArgument<"RefinementValue">];
-  let Subjects = SubjectList<[FunctionLike, ParmVar, Field],
-                             WarnDiag, "ExpectedFunctionMethodEnumOrClass">;
+def RefineFunctionAtt : InheritableAttr {
+  let Spellings = [GCC<"refinement_function">];
+  let Args = [];
+  let Subjects = SubjectList<[FunctionLike],
+                             WarnDiag, "ExpectedFunctionOrMethod">;
+  let Documentation = [Undocumented];
+}
+
+def RefineQualifierAtt : InheritableAttr {
+  let Spellings = [GCC<"refinement_qualifier">];
+  let Args = [VariadicStringArgument<"Qualifiers">];
+  let Subjects = SubjectList<[FunctionLike],
+                             WarnDiag, "ExpectedFunctionOrMethod">;
+  let Documentation = [Undocumented];
+}
+
+def RefineAssumeAtt : InheritableAttr {
+  let Spellings = [GCC<"refinement_assume">];
+  let Args = [StringArgument<"Refinement">];
+  let Subjects = SubjectList<[FunctionLike, Var, Field],
+                             WarnDiag, "ExpectedType">;
+  let Documentation = [Undocumented];
+}
+
+def RefineVerifyAtt : InheritableAttr {
+  let Spellings = [GCC<"refinement_verify">];
+  let Args = [StringArgument<"Refinement">];
+  let Subjects = SubjectList<[FunctionLike, Var, Field],
+                             WarnDiag, "ExpectedType">;
   let Documentation = [Undocumented];
 }
 
