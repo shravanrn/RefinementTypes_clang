@@ -452,7 +452,7 @@ def XRayInstrument : InheritableAttr {
 def RefineFunctionAtt : InheritableAttr {
   let Spellings = [GCC<"refinement_function">];
   let Args = [];
-  let Subjects = SubjectList<[FunctionLike],
+  let Subjects = SubjectList<[FunctionLike, ParmVar],
                              WarnDiag, "ExpectedFunctionOrMethod">;
   let Documentation = [Undocumented];
 }
@@ -468,7 +468,7 @@ def RefineQualifierAtt : InheritableAttr {
 def RefineAssumeAtt : InheritableAttr {
   let Spellings = [GCC<"refinement_assume">];
   let Args = [StringArgument<"Refinement">];
-  let Subjects = SubjectList<[FunctionLike, Var, Field],
+  let Subjects = SubjectList<[FunctionLike, ParmVar, Var, Field],
                              WarnDiag, "ExpectedType">;
   let Documentation = [Undocumented];
 }
@@ -476,7 +476,7 @@ def RefineAssumeAtt : InheritableAttr {
 def RefineVerifyAtt : InheritableAttr {
   let Spellings = [GCC<"refinement_verify">];
   let Args = [StringArgument<"Refinement">];
-  let Subjects = SubjectList<[FunctionLike, Var, Field],
+  let Subjects = SubjectList<[FunctionLike, ParmVar, Var, Field],
                              WarnDiag, "ExpectedType">;
   let Documentation = [Undocumented];
 }

@@ -3857,13 +3857,17 @@ static void handleAlwaysInlineAttr(Sema &S, Decl *D,
     D->addAttr(Inline);
 }
 
-static FunctionDecl* getFunctionDecl(Decl *D)
+static Decl* getSignatureDecl(Decl *D)
 {
-	FunctionDecl* fnDecl = nullptr;
+	Decl* fnDecl = nullptr;
 
 	if (auto fnDeclCast = dyn_cast<FunctionDecl>(D))
 	{
 		fnDecl = fnDeclCast;
+	}
+	else if (auto parmVarCast = dyn_cast<ParmVarDecl>(D))
+	{
+		fnDecl = parmVarCast;
 	}
 	else if (auto varDeclCast = dyn_cast<VarDecl>(D))
 	{
@@ -3880,57 +3884,68 @@ static FunctionDecl* getFunctionDecl(Decl *D)
 	return fnDecl;
 }
 
-static void handleRefineMetadataAtt(Sema &S, Decl *D, const AttributeList &Attr) {
-	//Any error messages such as missing argument are already handled
+static void handleRefineFunctionMetadataAtt(Sema &S, Decl *D, const AttributeList &Attr) {
+	D->addAttr(::new (S.Context) RefineFunctionAttAttr(Attr.getRange(), S.Context, Attr.getAttributeSpellingListIndex()));
+}
 
-	FunctionDecl* fnDecl = getFunctionDecl(D);
-	if (fnDecl == nullptr)
-	{
-		S.Diag(Attr.getLoc(), diag::err_attribute_refinement_parent_fn_not_found) << Attr.getName();
-	}
+static void handleRefineQualifierMetadataAtt(Sema &S, Decl *D, const AttributeList &Attr) {
+	if (!checkAttributeAtLeastNumArgs(S, Attr, 1))
+		return;
 
-	if (!fnDecl->hasAttr<RefineFunctionAttAttr>())
-	{
-		fnDecl->addAttr(::new (S.Context) RefineFunctionAttAttr(Attr.getRange(), S.Context, Attr.getAttributeSpellingListIndex()));
-	}
+	std::vector<StringRef> Qualifiers;
 
-	auto kind = Attr.getKind();
-	if (kind == AttributeList::AT_RefineQualifierAtt) {
+	for (unsigned I = 0, E = Attr.getNumArgs(); I != E; ++I) {
+		StringRef qualifier;
+		SourceLocation LiteralLoc;
 
-		if (!checkAttributeAtLeastNumArgs(S, Attr, 1))
+		if (!S.checkStringLiteralArgumentAttr(Attr, I, qualifier, &LiteralLoc))
 			return;
 
-		std::vector<StringRef> Qualifiers;
+		Qualifiers.push_back(qualifier);
+	}
 
-		for (unsigned I = 0, E = Attr.getNumArgs(); I != E; ++I) {
-			StringRef qualifier;
-			SourceLocation LiteralLoc;
+	D->addAttr(::new (S.Context) RefineQualifierAttAttr(
+		Attr.getRange(), S.Context, Qualifiers.data(), Qualifiers.size(),
+		Attr.getAttributeSpellingListIndex()));
+}
 
-			if (!S.checkStringLiteralArgumentAttr(Attr, I, qualifier, &LiteralLoc))
-				return;
+static void handleRefineAssumeMetadataAtt(Sema &S, Decl *D, const AttributeList &Attr) {
+	StringRef metadataString;
+	if (Attr.getNumArgs() && S.checkStringLiteralArgumentAttr(Attr, 0, metadataString)) {
+		D->addAttr(::new (S.Context) RefineAssumeAttAttr(Attr.getRange(), S.Context, metadataString, Attr.getAttributeSpellingListIndex()));
 
-			Qualifiers.push_back(qualifier);
+		Decl* sigDecl = getSignatureDecl(D);
+		if (sigDecl == nullptr)
+		{
+			S.Diag(Attr.getLoc(), diag::err_attribute_refinement_parent_fn_not_found) << Attr.getName();
+			return;
 		}
 
-		D->addAttr(::new (S.Context) NoSanitizeAttr(
-			Attr.getRange(), S.Context, Qualifiers.data(), Qualifiers.size(),
-			Attr.getAttributeSpellingListIndex()));
-	}
-	else
-	{
-		StringRef metadataString;
-		if (Attr.getNumArgs() && S.checkStringLiteralArgumentAttr(Attr, 0, metadataString)) {
-
-			if (kind == AttributeList::AT_RefineAssumeAtt) {
-				D->addAttr(::new (S.Context) RefineAssumeAttAttr(Attr.getRange(), S.Context, metadataString, Attr.getAttributeSpellingListIndex()));
-			}
-			else {
-				D->addAttr(::new (S.Context) RefineVerifyAttAttr(Attr.getRange(), S.Context, metadataString, Attr.getAttributeSpellingListIndex()));
-			}
+		if (!sigDecl->hasAttr<RefineFunctionAttAttr>())
+		{
+			sigDecl->addAttr(::new RefineFunctionAttAttr(Attr.getRange(), S.Context, Attr.getAttributeSpellingListIndex()));
 		}
 	}
 }
 
+static void handleRefineVerifyMetadataAtt(Sema &S, Decl *D, const AttributeList &Attr) {
+	StringRef metadataString;
+	if (Attr.getNumArgs() && S.checkStringLiteralArgumentAttr(Attr, 0, metadataString)) {
+		D->addAttr(::new (S.Context) RefineVerifyAttAttr(Attr.getRange(), S.Context, metadataString, Attr.getAttributeSpellingListIndex()));
+
+		Decl* sigDecl = getSignatureDecl(D);
+		if (sigDecl == nullptr)
+		{
+			S.Diag(Attr.getLoc(), diag::err_attribute_refinement_parent_fn_not_found) << Attr.getName();
+			return;
+		}
+
+		if (!sigDecl->hasAttr<RefineFunctionAttAttr>())
+		{
+			sigDecl->addAttr(::new RefineFunctionAttAttr(Attr.getRange(), S.Context, Attr.getAttributeSpellingListIndex()));
+		}
+	}
+}
 
 static void handleMinSizeAttr(Sema &S, Decl *D, const AttributeList &Attr) {
   if (MinSizeAttr *MinSize = S.mergeMinSizeAttr(
@@ -5800,10 +5815,16 @@ static void ProcessDeclAttribute(Sema &S, Scope *scope, Decl *D,
     handleAllocSizeAttr(S, D, Attr);
     break;
   case AttributeList::AT_RefineFunctionAtt:
+    handleRefineFunctionMetadataAtt(S, D, Attr);
+    break;
   case AttributeList::AT_RefineQualifierAtt:
+    handleRefineQualifierMetadataAtt(S, D, Attr);
+    break;
   case AttributeList::AT_RefineAssumeAtt:
+    handleRefineAssumeMetadataAtt(S, D, Attr);
+    break;
   case AttributeList::AT_RefineVerifyAtt:
-    handleRefineMetadataAtt(S, D, Attr);
+    handleRefineVerifyMetadataAtt(S, D, Attr);
     break;
   case AttributeList::AT_AlwaysInline:
     handleAlwaysInlineAttr(S, D, Attr);

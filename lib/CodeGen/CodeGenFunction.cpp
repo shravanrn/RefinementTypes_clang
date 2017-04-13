@@ -691,15 +691,26 @@ void CodeGenFunction::EmitOpenCLKernelMetadata(const FunctionDecl *FD,
   }
 }
 
-template<typename T>
-void RetrieveTypeAndName(T llvmDecl, std::vector<std::string>& refinementMetadata, bool isReturn)
+void RetrieveTypeAndNameForReturn(const QualType& RetTy, std::vector<std::string>& refinementMetadata)
+{
+	{
+		std::string typeNameString = RetTy.getAsString();
+		refinementMetadata.push_back(typeNameString);
+	}
+	{
+		std::string varNameString = "return";
+		refinementMetadata.push_back(varNameString);
+	}
+}
+
+void RetrieveTypeAndName(const VarDecl* llvmDecl, std::vector<std::string>& refinementMetadata)
 {
 	{
 		std::string typeNameString = llvmDecl->getType().getAsString();
 		refinementMetadata.push_back(typeNameString);
 	}
 	{
-		std::string varNameString = isReturn ? "return" : llvmDecl->getIdentifier()->getName().str();
+		std::string varNameString = llvmDecl->getIdentifier()->getName().str();
 		refinementMetadata.push_back(varNameString);
 	}
 }
@@ -753,24 +764,40 @@ void RetrieveQualifiers(const FunctionDecl* FD, std::vector<std::string>& refine
 	}
 }
 
+bool shouldComputeRefinementMetadata(const FunctionDecl& FD, const FunctionArgList &Args)
+{
+	if (FD.getAttr<RefineFunctionAttAttr>() != nullptr) {
+		return true;
+	}
+
+	for (auto i = Args.begin(), e = Args.end(); i != e; ++i) {
+		const VarDecl *VD = *i;
+		if (VD->getAttr<RefineFunctionAttAttr>() != nullptr) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 void storeRefinementsInMetadata(const Decl *D, QualType RetTy, llvm::Function *Fn, const FunctionArgList &Args, llvm::LLVMContext& context)
 {
 	if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(D))
 	{
-		bool applyRefinement = D->getAttr<RefineFunctionAttAttr>() != nullptr;
+		bool applyRefinement = shouldComputeRefinementMetadata(*FD, Args);
 
 		if(applyRefinement)
 		{
 			std::vector<std::string> parameterRefinements;
 			parameterRefinements.push_back("signature_return");
-			RetrieveTypeAndName(FD, parameterRefinements, true /* isReturn */);
+			RetrieveTypeAndNameForReturn(RetTy, parameterRefinements);
 			parameterRefinements.push_back("end");
 			GetRefinement(FD, parameterRefinements);
 
 			for (auto i = Args.begin(), e = Args.end(); i != e; ++i) {
 				const VarDecl *VD = *i;
 				parameterRefinements.push_back("signature_parameter");
-				RetrieveTypeAndName(VD, parameterRefinements, false /* isReturn */);
+				RetrieveTypeAndName(VD, parameterRefinements);
 				parameterRefinements.push_back("end");
 				GetRefinement(VD, parameterRefinements);
 			}
