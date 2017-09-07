@@ -715,11 +715,10 @@ void RetrieveTypeAndName(const VarDecl* llvmDecl, std::vector<std::string>& refi
 	}
 }
 
-template<typename T>
-void GetRefinement(T llvmDecl, std::vector<std::string>& refinementMetadata)
+void GetRefinement(const Decl* llvmDecl, std::vector<std::string>& refinementMetadata)
 {
 	{
-		auto refinementAtt = llvmDecl->getAttr<RefineAssumeAttAttr>();
+		const RefineAssumeAttAttr * refinementAtt = llvmDecl->getAttr<RefineAssumeAttAttr>();
 		refinementMetadata.push_back("assume");
 
 		if (refinementAtt != nullptr)
@@ -734,7 +733,7 @@ void GetRefinement(T llvmDecl, std::vector<std::string>& refinementMetadata)
 		refinementMetadata.push_back("end");
 	}
 	{
-		auto refinementAtt = llvmDecl->getAttr<RefineVerifyAttAttr>();
+		const RefineVerifyAttAttr* refinementAtt = llvmDecl->getAttr<RefineVerifyAttAttr>();
 		refinementMetadata.push_back("verify");
 
 		if (refinementAtt != nullptr)
@@ -752,7 +751,7 @@ void GetRefinement(T llvmDecl, std::vector<std::string>& refinementMetadata)
 
 void RetrieveQualifiers(const FunctionDecl* FD, std::vector<std::string>& refinementMetadata)
 {
-	auto refinementAtt = FD->getAttr<RefineQualifierAttAttr>();
+	const RefineQualifierAttAttr* refinementAtt = FD->getAttr<RefineQualifierAttAttr>();
 	if (refinementAtt != nullptr)
 	{
 		for (auto& qualifier : refinementAtt->qualifiers())
